@@ -199,20 +199,23 @@ void ComputeArrayResidual(const std::vector<seed_t> & seed_vector, bool square =
         std::cout<<"Arrays: Residual"<<std::endl;
         tstart = dtime();  
 
-     
+        //#pragma omp parallel shared(chunk) private(i)
+        //{
             
             #pragma ivdep
             {
-                #pragma omp parallel for private(i)   
-                for(int i = 0; i < seed_entries; i++)
-                {
-                    residual_array[i]  = fabs(hit1_radius_array[i] - (hit2_radius_array[i] - hit0_radius_array[i])
+            //#pragma omp for schedule(dynamic, chunk) nowait  // **LOOP WAS NOT VECTORIZED:  NOT INNER LOOP**
+            #pragma omp parallel for private(i)   // **LOOP WAS NOT VECTORIZED:  NOT INNER LOOP**
+            for(int i = 0; i < seed_entries; i++)
+            {
+                residual_array[i]  = fabs(hit1_radius_array[i] - (hit2_radius_array[i] - hit0_radius_array[i])
                         / (hit2_z_array[i] - hit0_z_array[i])*hit1_z_array[i] - (hit2_radius_array[i] - hit2_z_array[i]*slope_array[i]))
-                        / sqrt((  hit2_radius_array[i] - hit0_radius_array[i])/(hit2_z_array[i] - hit0_z_array[i]   ) 
-                        * (hit2_radius_array[i] - hit0_radius_array[i])/(hit2_z_array[i] - hit0_z_array[i]) + 1); 
-                }
+                    / sqrt((  hit2_radius_array[i] - hit0_radius_array[i])/(hit2_z_array[i] - hit0_z_array[i]   ) 
+                            * (hit2_radius_array[i] - hit0_radius_array[i])/(hit2_z_array[i] - hit0_z_array[i]) + 1); 
+          //  }
+            }
 
-            } 
+        } 
         tstop = dtime();
         ttime = tstop - tstart;
         std::cout<<" Elapsed time: " << ttime <<"s"<< std::endl<<std::endl;
@@ -224,8 +227,15 @@ void ComputeArrayResidual(const std::vector<seed_t> & seed_vector, bool square =
         std::cout<<"Arrays: Residual Squared"<<std::endl;
         tstart = dtime();  
 
+        // 1.  #pragma omp parallel shared(chunk) private(i)
         #pragma ivdep
         {
+            // In the parallel region, query how many threads are available and divide the arrays
+            //2.  num_threads = omp_get_num_threads();
+            //3.  chunk = seed_entries/num_threads;
+
+            //#pragma omp for schedule(dynamic, chunk) nowait  // **LOOP WAS NOT VECTORIZED:  NOT INNER LOOP**
+            //4.  #pragma omp for schedule(dynamic, chunk)   // **LOOP WAS NOT VECTORIZED:  NOT INNER LOOP**
             #pragma omp parallel for private(i)
             for(int i = 0; i < seed_entries; i++)
             {
@@ -296,6 +306,25 @@ int main()
             residuals[i] = CalcResidual(seed_vector[i]);
         }
     }
+  
+    /* 2.
+    #pragma ivdep 
+    {
+    #pragma omp parallel shared(chunk) private(i) 
+    //#pragma omp parallel shared(seed_vector, chunk) private(i) 
+        { 
+            // In the parallel region, query how many threads are available and divide the arrays
+            num_threads = omp_get_num_threads();
+            chunk = seed_entries/num_threads;
+   
+            #pragma omp for schedule(dynamic, chunk) nowait // **LOOP WAS NOT VECTORIZED:  NOT INNER LOOP**
+            for(i = 0; i < seed_entries; i++)
+            {
+                residuals[i] = CalcResidual(seed_vector[i]);
+            }
+        }// end of parallel section
+    }
+    */
 
     tstop0 = dtime();
     ttime0 = tstop0 - tstart0;
@@ -321,6 +350,25 @@ int main()
         }
     }
 
+
+    /*  3.  
+    #pragma ivdep 
+    {
+    #pragma omp parallel shared(chunk) private(i) 
+    //#pragma omp parallel shared(seed_vector, chunk) private(i) 
+        { 
+            // In the parallel region, query how many threads are available and divide the arrays
+            num_threads = omp_get_num_threads();
+            chunk = seed_entries/num_threads;
+    
+            #pragma omp for schedule(dynamic, chunk) nowait  // **LOOP WAS NOT VECTORIZED:  NOT INNER LOOP**
+            for(i = 0; i < seed_vector.size(); i++)
+            {
+                square_residuals[i] = CalcSquareResidual(seed_vector[i]);
+            }
+        }// end of parallel section
+    }
+    */
     tstop0_imp = dtime();
     ttime0_imp = tstop0_imp - tstart0_imp;
     std::cout<<" Elapsed time: " << ttime0_imp <<"s"<< std::endl<<std::endl;
