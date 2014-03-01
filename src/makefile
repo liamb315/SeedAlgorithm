@@ -15,3 +15,7 @@ array:
 
 struct:
 	$(CC) $(CFLAGS) StructSeedAlgorithm.C ../tools/ReadSeedFile.C -o ../output/structTest	
+
+clean:
+	rm -f ../output/arrayTest
+	rm -f ../output/structTest
