@@ -65,7 +65,7 @@ inline float CalcResidual(const seed_t & seed)
 
     // Residual distance of third seed_hit coordinate from line
     resid = fabs(radius1 - slope*seed_hit1z - intercept)
-          / sqrt(slope*slope + 1);
+          / sqrtf(slope*slope + 1);
     
     return resid;
 }
@@ -128,8 +128,9 @@ int main()
     
     tstart0 = dtime();   
     #pragma ivdep
-    {
-        #pragma omp parallel for private(i)        
+    {     
+        //#pragma omp parallel for private(i)
+        #pragma omp parallel for simd private(i)
         for(i = 0; i < seed_entries; i++)
         {
             residuals[i] = CalcResidual(seed_vector[i]);
@@ -152,8 +153,9 @@ int main()
 
     tstart0_imp = dtime();   
     #pragma ivdep
-    {
-        #pragma omp parallel for private(i)        
+    {     
+        //#pragma omp parallel for private(i)
+        #pragma omp parallel for simd private(i)
         for(i = 0; i < seed_entries; i++)
         {
             square_residuals[i] = CalcSquareResidual(seed_vector[i]);
