@@ -90,17 +90,19 @@ void ComputeArrayResidual(const std::vector<seed_t> & seed_vector, bool square =
     // Pragma tells the compiler to ignore non-obvious dependencies
     //#pragma ivdep
     //#pragma omp parallel for
-    {
-        for(int i = 0; i < seed_entries; i++)
-        {    
-            hit0_radius_array[i] = seed_vector[i].hit0_radius; 
-            hit1_radius_array[i] = seed_vector[i].hit1_radius; 
-            hit2_radius_array[i] = seed_vector[i].hit2_radius; 
-            hit0_z_array[i]      = seed_vector[i].hit0_z; 
-            hit1_z_array[i]      = seed_vector[i].hit1_z; 
-            hit2_z_array[i]      = seed_vector[i].hit2_z; 
-        }
+    
+    
+    #pragma omp parallel for simd private(i)
+    for(int i = 0; i < seed_entries; i++)
+    {    
+        hit0_radius_array[i] = seed_vector[i].hit0_radius; 
+        hit1_radius_array[i] = seed_vector[i].hit1_radius; 
+        hit2_radius_array[i] = seed_vector[i].hit2_radius; 
+        hit0_z_array[i]      = seed_vector[i].hit0_z; 
+        hit1_z_array[i]      = seed_vector[i].hit1_z; 
+        hit2_z_array[i]      = seed_vector[i].hit2_z; 
     }
+    
     
     // Perform standard residual calculation
     if(square == false)
@@ -110,13 +112,15 @@ void ComputeArrayResidual(const std::vector<seed_t> & seed_vector, bool square =
 
         #pragma ivdep
         {
-            #pragma omp parallel for private(i)   
+            //#pragma omp parallel for private(i)   
+            #pragma omp parallel for simd private(i)
             for(int i = 0; i < seed_entries; i++)
             {
-                residual_array[i]  = fabs(hit1_radius_array[i] - (hit2_radius_array[i] - hit0_radius_array[i])
-                    / (hit2_z_array[i] - hit0_z_array[i])*hit1_z_array[i] - (hit2_radius_array[i] - hit2_z_array[i]*slope_array[i]))
-                    / sqrt((  hit2_radius_array[i] - hit0_radius_array[i])/(hit2_z_array[i] - hit0_z_array[i]   ) 
-                    * (hit2_radius_array[i] - hit0_radius_array[i])/(hit2_z_array[i] - hit0_z_array[i]) + 1); 
+                float slope = (hit2_radius_array[i] - hit0_radius_array[i]) / (hit2_z_array[i] - hit0_z_array[i]);
+                float inter =  hit2_radius_array[i] - hit2_z_array[i] * slope;
+
+                residual_array[i] = fabs (hit1_radius_array[i] - slope * hit1_z_array[i] - inter) /
+                sqrtf (1.0f + slope * slope);  
             }
         } 
         tstop = dtime();
@@ -132,14 +136,15 @@ void ComputeArrayResidual(const std::vector<seed_t> & seed_vector, bool square =
 
         #pragma ivdep
         {
-            #pragma omp parallel for private(i)
+            //#pragma omp parallel for private(i)
+            #pragma omp parallel for simd private(i)
             for(int i = 0; i < seed_entries; i++)
             {
-                slope_array[i]     = (hit2_radius_array[i] - hit0_radius_array[i])/(hit2_z_array[i] - hit0_z_array[i]); 
-                intercept_array[i] = hit2_radius_array[i] - hit2_z_array[i]*slope_array[i];
-                residual_array[i]  = (hit1_radius_array[i] - slope_array[i]*hit1_z_array[i] - intercept_array[i]);
-                residual_array[i]  = residual_array[i] * residual_array[i]            
-                                   / (slope_array[i] * slope_array[i] + 1); 
+                float slope = (hit2_radius_array[i] - hit0_radius_array[i]) / (hit2_z_array[i] - hit0_z_array[i]);
+                float inter =  hit2_radius_array[i] - hit2_z_array[i] * slope;
+                
+                residual_array[i] = hit1_radius_array[i] - slope * hit1_z_array[i] - inter;
+                residual_array[i] = residual_array[i] * residual_array[i] / (1.0f + slope * slope);                
             }
         } 
         tstop = dtime();
