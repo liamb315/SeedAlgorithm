@@ -14,6 +14,10 @@
 #include <sstream>
 #include <cmath>
 
+// User
+#include "Seed.h"
+#include "ReadSeedFile.h"
+
 /////////////////////////////////////
 //             Methods             //
 /////////////////////////////////////
@@ -26,51 +30,6 @@ double dtime()
     gettimeofday(&mytime,(struct timezone*)0);
     tseconds = (double)(mytime.tv_sec + mytime.tv_usec*1.0e-6);
     return( tseconds );
-}
-
-// Struct to contain the data of the Root file
-struct seed_t
-{
-    // Members of the struct
-    float hit0_radius, hit1_radius, hit2_radius;
-    float hit0_z, hit1_z, hit2_z;
-};
-
-// Reads the result of the .txt and outputs a vector of the seed structs
-std::vector<seed_t> ReadFile()
-{
-    using namespace std;
-
-    // Define the ifstream
-    std::ifstream datafile;
-    datafile.open("data/seedDataFile.txt", std::ifstream::in);
-
-    // Vector of seed structs to store
-    std::vector<seed_t>  seed_vector;
-
-    std::string line;
-    
-    while(std::getline(datafile, line))
-    {
-        std::stringstream line_stream(line);
-        seed_t seed;
-        std::string field;
-
-        // Read in a CSV format
-        std::getline(line_stream, field, ','); seed.hit0_radius = atof(field.c_str());
-        std::getline(line_stream, field, ','); seed.hit1_radius = atof(field.c_str());
-        std::getline(line_stream, field, ','); seed.hit2_radius = atof(field.c_str());
-        std::getline(line_stream, field, ','); seed.hit0_z = atof(field.c_str());
-        std::getline(line_stream, field, ','); seed.hit1_z = atof(field.c_str());
-        std::getline(line_stream, field, ','); seed.hit2_z = atof(field.c_str());
-        
-        // Add each seed struct into the vector
-        seed_vector.push_back(seed);
-    }
-    
-    datafile.close();
- 
-    return seed_vector;
 }
 
 // Extend the length of the vector by a multiplicative factor
@@ -137,132 +96,12 @@ inline float CalcSquareResidual(const seed_t & seed)
     return sqresid;
 }
 
-// Calculate the Residuals Using Arrays
-void ComputeArrayResidual(const std::vector<seed_t> & seed_vector, bool square = false)
-{
-    if(seed_vector.empty() == true)
-    {
-        std::cout<< "Seed vector empty" << std::endl;
-        return;    
-    }        
-    
-    double tstart = 0, tstop = 0, ttime = 0;
-    int i = 0, num_threads = 0, chunk = 0;
-
-    int seed_entries = seed_vector.size();
-
-    // Define array pointers
-    float * hit0_z_array;
-    float * hit1_z_array;
-    float * hit2_z_array;
-    float * hit0_radius_array;
-    float * hit1_radius_array;
-    float * hit2_radius_array;
-    float * slope_array;
-    float * intercept_array;
-    float * residual_array;
-
-    // Allocate memory 
-    hit0_z_array      = (float*) _mm_malloc(sizeof(float)*seed_entries, 64); 
-    hit1_z_array      = (float*) _mm_malloc(sizeof(float)*seed_entries, 64); 
-    hit2_z_array      = (float*) _mm_malloc(sizeof(float)*seed_entries, 64); 
-    hit0_radius_array = (float*) _mm_malloc(sizeof(float)*seed_entries, 64); 
-    hit1_radius_array = (float*) _mm_malloc(sizeof(float)*seed_entries, 64); 
-    hit2_radius_array = (float*) _mm_malloc(sizeof(float)*seed_entries, 64); 
-    slope_array       = (float*) _mm_malloc(sizeof(float)*seed_entries, 64); 
-    intercept_array   = (float*) _mm_malloc(sizeof(float)*seed_entries, 64); 
-    residual_array    = (float*) _mm_malloc(sizeof(float)*seed_entries, 64); 
-
-    #pragma omp parallel
-    #pragma omp master
-    num_threads = omp_get_num_threads();
-    chunk = seed_entries/num_threads;
-
-    // Pragma tells the compiler to ignore non-obvious dependencies
-    //#pragma ivdep
-    //#pragma omp parallel for
-    {
-        for(int i = 0; i < seed_entries; i++)
-        {    
-            hit0_radius_array[i] = seed_vector[i].hit0_radius; 
-            hit1_radius_array[i] = seed_vector[i].hit1_radius; 
-            hit2_radius_array[i] = seed_vector[i].hit2_radius; 
-            hit0_z_array[i]      = seed_vector[i].hit0_z; 
-            hit1_z_array[i]      = seed_vector[i].hit1_z; 
-            hit2_z_array[i]      = seed_vector[i].hit2_z; 
-        }
-    }
-    
-    // Perform standard residual calculation
-    if(square == false)
-    {    
-        std::cout<<"Arrays: Residual"<<std::endl;
-        tstart = dtime();  
-
-     
-            
-            #pragma ivdep
-            {
-                #pragma omp parallel for private(i)   
-                for(int i = 0; i < seed_entries; i++)
-                {
-                    residual_array[i]  = fabs(hit1_radius_array[i] - (hit2_radius_array[i] - hit0_radius_array[i])
-                        / (hit2_z_array[i] - hit0_z_array[i])*hit1_z_array[i] - (hit2_radius_array[i] - hit2_z_array[i]*slope_array[i]))
-                        / sqrt((  hit2_radius_array[i] - hit0_radius_array[i])/(hit2_z_array[i] - hit0_z_array[i]   ) 
-                        * (hit2_radius_array[i] - hit0_radius_array[i])/(hit2_z_array[i] - hit0_z_array[i]) + 1); 
-                }
-
-            } 
-        tstop = dtime();
-        ttime = tstop - tstart;
-        std::cout<<" Elapsed time: " << ttime <<"s"<< std::endl<<std::endl;
-    }
-
-    // Perform squared residual calculation
-    else
-    {
-        std::cout<<"Arrays: Residual Squared"<<std::endl;
-        tstart = dtime();  
-
-        #pragma ivdep
-        {
-            #pragma omp parallel for private(i)
-            for(int i = 0; i < seed_entries; i++)
-            {
-                slope_array[i]     = (hit2_radius_array[i] - hit0_radius_array[i])/(hit2_z_array[i] - hit0_z_array[i]); 
-                intercept_array[i] = hit2_radius_array[i] - hit2_z_array[i]*slope_array[i];
-                residual_array[i]  = (hit1_radius_array[i] - slope_array[i]*hit1_z_array[i] - intercept_array[i]);
-                residual_array[i]  = residual_array[i] * residual_array[i]            
-                                   / (slope_array[i] * slope_array[i] + 1); 
-            }
-        } 
-        tstop = dtime();
-        ttime = tstop - tstart;
-        std::cout<<" Elapsed time: " << ttime <<"s"<< std::endl<<std::endl;
-    }        
-
-    // Free the aligned memory blocks 
-    _mm_free(hit0_z_array);
-    _mm_free(hit1_z_array);
-    _mm_free(hit2_z_array);
-    _mm_free(hit0_radius_array);
-    _mm_free(hit1_radius_array);
-    _mm_free(hit2_radius_array);
-    _mm_free(slope_array);
-    _mm_free(intercept_array);
-    _mm_free(residual_array);
-}    
-
 
 /////////////////////////////////////
 //          Main Method            //
 /////////////////////////////////////
 int main()
 {
-    
-    ////////////////////////////
-    //   Set Up
-    ////////////////////////////
     double tstart0, tstop0, ttime0;
     double tstart0_imp, tstop0_imp, ttime0_imp;
 
@@ -324,18 +163,6 @@ int main()
     tstop0_imp = dtime();
     ttime0_imp = tstop0_imp - tstart0_imp;
     std::cout<<" Elapsed time: " << ttime0_imp <<"s"<< std::endl<<std::endl;
-
-
-    ////////////////////////////
-    // Arrays:  Residual
-    ////////////////////////////
-    ComputeArrayResidual(seed_vector, false);
-   
-    
-    ////////////////////////////
-    // Arrays:  Square Residual
-    ////////////////////////////
-    ComputeArrayResidual(seed_vector, true);
 
     
     ////////////////////////////
