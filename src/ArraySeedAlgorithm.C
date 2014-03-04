@@ -26,7 +26,7 @@
 // Returns the current wall clock time
 double dtime()
 {
-    double tseconds = 0.0;
+    double tseconds     = 0.0;
     struct timeval mytime;
     gettimeofday(&mytime,(struct timezone*)0);
     tseconds = (double)(mytime.tv_sec + mytime.tv_usec*1.0e-6);
@@ -57,6 +57,8 @@ void ComputeArrayResidual(const std::vector<seed_t> & seed_vector, bool square =
     
     double tstart = 0, tstop = 0, ttime = 0;
     int i = 0, num_threads = 0, chunk = 0;
+    double gflops_res   = 0.0;
+    double gflops_sqr   = 0.0;
 
     int seed_entries = seed_vector.size();
 
@@ -87,6 +89,7 @@ void ComputeArrayResidual(const std::vector<seed_t> & seed_vector, bool square =
     num_threads = omp_get_num_threads();
     chunk = seed_entries/num_threads;
 
+    std::cout<<"Number of threads = " << num_threads << std::endl;
     // Pragma tells the compiler to ignore non-obvious dependencies
     //#pragma ivdep
     //#pragma omp parallel for
@@ -107,6 +110,7 @@ void ComputeArrayResidual(const std::vector<seed_t> & seed_vector, bool square =
     // Perform standard residual calculation
     if(square == false)
     {    
+        int FLOPSPERCALC = 10;
         std::cout<<"Arrays: Residual"<<std::endl;
         tstart = dtime();  
 
@@ -125,7 +129,13 @@ void ComputeArrayResidual(const std::vector<seed_t> & seed_vector, bool square =
         } 
         tstop = dtime();
         ttime = tstop - tstart;
-        std::cout<<" Elapsed time: " << ttime <<"s"<< std::endl<<std::endl;
+        gflops_res = (double)( 1.0e-9*FLOPSPERCALC*seed_entries);
+
+        if( ttime > 0.0)
+        {
+            std::cout<<" GFLOPS = " << gflops_res << ", Time(s) = " << ttime << ", GFLOPS/s = " << 
+                gflops_res/ttime << std::endl << std::endl;
+        }    
     }
 
     // Perform squared residual calculation
