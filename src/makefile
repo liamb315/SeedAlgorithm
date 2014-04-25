@@ -24,3 +24,5 @@ struct:
 clean:
 	rm -f ../output/arrayTest
 	rm -f ../output/structTest
+	rm -f ../output/arrayTest_mmic
+	rm -f ../output/structTest_mmic
