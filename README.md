@@ -2,9 +2,12 @@
 
 ## Motivation
 There are three structures of code within SeedAlgorithm.  
-1.  Array-based Code
-2.  Struct-based Code
-3.  Array of Structures of Arrays (AOSOA) - based code
+
+-  Array-based Code
+
+-  Struct-based Code
+
+-  Array of Structures of Arrays (AOSOA) - based code
 
 This is designed to test the parallel processing speeds under different data architectures.  
 
@@ -13,23 +16,23 @@ This is designed to test the parallel processing speeds under different data arc
 
 1.  In the src/ directory,  
    
-    $  make
+    *$  make*
 2.  Move to the output directory,
    
-    $  cd ../output/
+    *$  cd ../output/*
 3.  Transfer executables to the mic0
    
-    $  scp 'filename' mic0:~/bin/
+    *$  scp 'filename' mic0:~/bin/*
 4.  Move to mic0
    
-    $  ssh mic0
+    *$  ssh mic0*
    
-    %  cd bin/
+    *%  cd bin/*
 5.  Set environment variables and execute file*
    
-    %   export OMP_NUM_THREADS=122
+    *%   export OMP_NUM_THREADS=122*
    
-    %   ./'filename'
+    *%   ./'filename'*
 
 
  *  This relies on the data file, seedDataFile.txt, being in data folder.  Executable looks '../data/seedDataFile.txt'
