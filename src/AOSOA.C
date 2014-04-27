@@ -49,24 +49,95 @@ std::vector<seed_t> ExtendVector(std::vector<seed_t> & init_vec, int factor)
 // Define Struct of Small Arrays
 struct smallArrays_t
 {
-    // Length of the arrays, the s
-    int N = 16;
-    float hit0_radius[N];
-    float hit1_radius[N];
-    float hit2_radius[N];
-    float hit0_z[N];
-    float hit1_z[N];
-    float hit2_z[N];
+    float hit0_radius[16];
+    float hit1_radius[16];
+    float hit2_radius[16];
+    float hit0_z[16];
+    float hit1_z[16];
+    float hit2_z[16];
 };
 
-// Calculate the Residuals Using an Array Of Structs Of Arrays (AOSOA)
-// Motivation
+/* To Do
+1.  Create one SOA every 16 seeds
+2.  Fill properly
+3.  Figure out dependencies warnings
+*/
+
+
+// Returns an AOSOA of small array-size N
+smallArrays_t * MakeAOSOA(const std::vector<seed_t> & seed_vector, const int N)
+{
+    // Declare the array pointer for the AOSOA
+    smallArrays_t * AOSOA;
+
+    // Determine the size of the AOSOA
+    int seed_entries   = seed_vector.size();
+    int num_structs    = seed_entries/N;
+    int residual_seeds = seed_entries % N;
+
+    std::cout<<"seed_entries: " << seed_entries << std::endl;
+    std::cout<<"num_structs: " << num_structs << std::endl;
+    std::cout<<"residual_seeds: " << residual_seeds << std::endl;
+
+    // If the seed_entries are not evenly divisible, increase size of AOSOA to hold remainder
+    if(residual_seeds  != 0)
+        num_structs++;
+
+    // Allocate memory for AOSOA
+    AOSOA = (smallArrays_t *) _mm_malloc(sizeof(smallArrays_t) * (num_structs), 64);
+    int k = -1;  // Index for the AOSOA
+
+    // Iterate over the seed_vector, add smallArrays_t structs into AOSOA
+    //for(int i = 0; i < seed_entries; i++)
+    for(int i = 0; i < 100; i++)
+    {
+        // Index for the small arrays
+        int j = i % N;        
+        
+        std::cout<<"i, j, k: " << i <<", " << j << ", " << k << std::endl;
+
+        // Create an instance of the Structure of Arrays (SOA)
+        std::cout<<"New SOA created"<<std::endl;
+        smallArrays_t SOA;  
+
+        // Every 16 elements, do the following procedures
+        if(j == 0) {k++;}    
+        
+        // Fill the SOA from the seed_vector
+        SOA.hit0_radius[j] = seed_vector[i].hit0_radius;
+        SOA.hit1_radius[j] = seed_vector[i].hit1_radius;
+        SOA.hit2_radius[j] = seed_vector[i].hit2_radius;
+        SOA.hit0_z[j]      = seed_vector[i].hit0_z;
+        SOA.hit1_z[j]      = seed_vector[i].hit1_z;
+        SOA.hit2_z[j]      = seed_vector[i].hit2_z;
+
+        // Add the SOA to the AOSOA after all 16 array elements have been filled        
+        if(j == 15)
+        {
+            std::cout<<"Add SOA to AOSOA at position " << k <<std::endl;
+            AOSOA[k] = SOA;
+        }    
+            
+    }    
+
+    //for(int i = 0; i < num_structs)
+
+}
+
+
+// Times the Residuals Calculation Using an Array Of Structs Of Arrays (AOSOA)
 /*  Accessing memory consecutively is the fastest way to access memory on Intel Phi
     This improves cache efficiency, reduces the number of Translational Lookaside Buffer (TLB)
     misses, etc.
     AOSOA allows efficienct vectorization, while not overloading the TLB, nor spreading accesses
-    across many pages.  
+    across many pages. 
 */
+void ComputeAOSOAResidual(smallArrays_t *, bool square = false)
+{
+    return;
+}
+
+/*
 void ComputeAOSOAResidual(const std::vector<seed_t> & seed_vector, bool square = false, const int N)
 {
     if(seed_vector.empty() == true)
@@ -222,7 +293,7 @@ void ComputeAOSOAResidual(const std::vector<seed_t> & seed_vector, bool square =
     _mm_free(intercept_array);
     _mm_free(residual_array);
 }    
-
+*/
 
 /////////////////////////////////////
 //          Main Method            //
@@ -234,11 +305,11 @@ int main()
     std::vector<seed_t> seed_vector = ReadFile();
     seed_vector  = ExtendVector(seed_vector, 100); 
 
-    // Arrays:  Residual
-    ComputeArrayResidual(seed_vector, false); 
- 
-    // Arrays:  Square Residual
-    ComputeArrayResidual(seed_vector, true);
+    // Allocate memory for and create the Array of Structs (smallArrays_t)
+    smallArrays_t * AOSOA;
+    AOSOA  = MakeAOSOA(seed_vector, 16);
+
+
 
     return 0;
 }   
